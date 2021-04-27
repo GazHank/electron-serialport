@@ -14,10 +14,12 @@ let mainWindow
 function createWindow() {
     // Create the browser window.
     mainWindow = new BrowserWindow({
-        width: 1400,
-        height: 600,
+        width: 1600,
+        height: 800,
+        backgroundColor: "#fff",
         webPreferences: {
             nodeIntegration: true,
+            contextIsolation: false, // HACK Workaround required in electron 12 
             preload: path.join(__dirname, 'preload.js')
         }
     })
