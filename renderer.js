@@ -71,8 +71,9 @@ async function openConnection(device) {
     updateinterface();
     SerialPort = null;
   })
-  SerialPort.on('error', function() {
+  SerialPort.on('error', err => {
     console.log("port error");
+    console.log(err);
     updateinterface();
     SerialPort = null;
   })
@@ -81,10 +82,10 @@ async function openConnection(device) {
 async function updateinterface() {
   if (SerialPort && SerialPort.isOpen) {
     tableHTML = tableify(SerialPort)
-    document.getElementById('connection').innerHTML = tableHTML
+    // document.getElementById('connection').innerHTML = tableHTML
     document.getElementById('connectionButtons').innerHTML = '<button id="dtr" onclick="resetDevice()">ResetDevice</button><button id="dtrTrue" onclick="setDTR(true)">DTR: true</button><button id="dtrFalse" onclick="setDTR(false)">DTR: false</button><button id="close" onclick="closeConnection()">Disconnect</button>'
   } else {
-    document.getElementById('connection').innerHTML = ""
+    // document.getElementById('connection').innerHTML = ""
     listSerialPorts()
   }
 }
@@ -95,7 +96,7 @@ async function closeConnection() {
   }
   SerialPort = null;
   console.log(SerialPort);
-  document.getElementById('connection').innerHTML = ""
+  // document.getElementById('connection').innerHTML = ""
   listSerialPorts()
 }
 
@@ -117,7 +118,7 @@ async function resetDevice() {
     console.log("  dtr false")
     setDTR(false)
     await delay(1500)
-    document.getElementById('connection').innerHTML = ""
+    // document.getElementById('connection').innerHTML = ""
     listSerialPorts()
   } else {
     // Can't reset if there is no active connection
