@@ -81,11 +81,20 @@ async function openConnection(device) {
 
 async function updateinterface() {
   if (SerialPort && SerialPort.isOpen) {
+    //
+    SerialPort.get(function(error, status) {
+      if (!error) {
+        console.log(status);
+      }
+  
+      return callback(error);
+    });
     tableHTML = tableify(SerialPort)
-    // document.getElementById('connection').innerHTML = tableHTML
+    document.getElementById('connection').innerHTML = tableHTML
     document.getElementById('connectionButtons').innerHTML = '<button id="dtr" onclick="resetDevice()">ResetDevice</button><button id="dtrTrue" onclick="setDTR(true)">DTR: true</button><button id="dtrFalse" onclick="setDTR(false)">DTR: false</button><button id="close" onclick="closeConnection()">Disconnect</button>'
   } else {
-    // document.getElementById('connection').innerHTML = ""
+    //
+    document.getElementById('connection').innerHTML = ""
     listSerialPorts()
   }
 }
@@ -96,17 +105,43 @@ async function closeConnection() {
   }
   SerialPort = null;
   console.log(SerialPort);
-  // document.getElementById('connection').innerHTML = ""
+  //
+  document.getElementById('connection').innerHTML = ""
   listSerialPorts()
 }
 
 async function setDTR(bool) {
   var props = {
+    lowLatency: true,
     rts: false,
+    cts: bool,
+    dsr: bool,
     dtr: bool
   };
-  SerialPort.set(props);
+  SerialPort.set(props, function(error) {
+    if (!error) {
+      console.log('set complete.');
+    }
+
+    return callback(error);
+  });
+  await delay(50)
+  SerialPort.get(function(error, status) {
+    if (!error) {
+      console.log(status);
+    }
+
+    return callback(error);
+  });
 }
+
+let callback = (error, result) => {
+  if (error !== null) {
+  console.log("Caught error: " + String(error));
+  return;
+  }
+  // console.log(result);
+};
 
 async function resetDevice() {
   if (SerialPort && SerialPort.isOpen) {
@@ -118,7 +153,8 @@ async function resetDevice() {
     console.log("  dtr false")
     setDTR(false)
     await delay(1500)
-    // document.getElementById('connection').innerHTML = ""
+    //
+    document.getElementById('connection').innerHTML = ""
     listSerialPorts()
   } else {
     // Can't reset if there is no active connection
