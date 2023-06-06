@@ -2,14 +2,16 @@
 // be executed in the renderer process for that window.
 // All of the Node.js APIs are available in this process.
 
-const SP = require('serialport')
+const { SerialPort } = require('serialport')
+
+const { DelimiterParser } = require("@serialport/parser-delimiter");
 const tableify = require('tableify')
 const delay = time => new Promise(res=>setTimeout(res,time));
   
-var SerialPort;
+var Port, result, callbacks, supportedCommands;
 
 async function listSerialPorts() {
-  await SP.list().then((ports, err) => {
+  await SerialPort.list().then((ports, err) => {
     if(err) {
       document.getElementById('error').textContent = err.message
       return
@@ -49,9 +51,9 @@ async function openConnection(device) {
   } else {
     throw new Error("Invalid argument");
   }
-  SerialPort = new SP(
-    path,
+  Port = new SerialPort(
     {
+      path: path,
       baudRate: 115200,
       lock: true
     },
@@ -61,37 +63,60 @@ async function openConnection(device) {
       }
     }
   );
-  // SerialPort = test;
-  SerialPort.on('open', function() {
-    console.log("port open", SerialPort);
+  // Port = test;
+  Port.on('open', function() {
+    console.log("port open", Port);
     updateinterface();
+    parser = Port.pipe(new DelimiterParser({ delimiter: "\r\n" }));
+    result = "";
+    callbacks = [];
+    supportedCommands = [];
+    parser.on("data", data => {
+      data = data.toString("utf-8");
+      console.log("focus: incoming data:", data);
+
+      if (data == ".") {
+        // let result = result,
+          resolve = callbacks.shift();
+
+        this.result = "";
+        if (resolve) {
+          resolve(result);
+        }
+      } else {
+        if (result.length == 0) {
+          result = data;
+        } else {
+          result += "\r\n" + data;
+        }
+      }
+    });
   })
-  SerialPort.on('close', function() {
-    console.log("port closed");
+  Port.on('close', function() {
+    console.log("port closed!!!!!!");
     updateinterface();
-    SerialPort = null;
+    Port = null;
   })
-  SerialPort.on('error', err => {
+  Port.on('error', err => {
     console.log("port error");
     console.log(err);
     updateinterface();
-    SerialPort = null;
+    Port = null;
   })
 }
 
 async function updateinterface() {
-  if (SerialPort && SerialPort.isOpen) {
+  if (Port && Port.isOpen) {
     //
-    SerialPort.get(function(error, status) {
+    Port.get(function(error, status) {
       if (!error) {
         console.log(status);
       }
-  
       return callback(error);
     });
-    tableHTML = tableify(SerialPort)
+    tableHTML = tableify(Port)
     document.getElementById('connection').innerHTML = tableHTML
-    document.getElementById('connectionButtons').innerHTML = '<button id="dtr" onclick="resetDevice()">ResetDevice</button><button id="dtrTrue" onclick="setDTR(true)">DTR: true</button><button id="dtrFalse" onclick="setDTR(false)">DTR: false</button><button id="close" onclick="closeConnection()">Disconnect</button>'
+    document.getElementById('connectionButtons').innerHTML = '<button id="dtr" onclick="resetDevice()">ResetDevice</button><button id="dtrTrue" onclick="setDTR(true)">DTR: true</button><button id="dtrFalse" onclick="setDTR(false)">DTR: false</button><button id="close" onclick="closeConnection()">Disconnect</button><button id="close" onclick="flushConnection()">Flush</button><button id="close" onclick="drainConnection()">Drain</button><button id="close" onclick="writePort()">Write Stuff</button>'
   } else {
     //
     document.getElementById('connection').innerHTML = ""
@@ -100,14 +125,50 @@ async function updateinterface() {
 }
 
 async function closeConnection() {
-  if (SerialPort && SerialPort.isOpen) {
-    SerialPort.close();
+  if (Port && Port.isOpen) {
+    Port.close();
   }
-  SerialPort = null;
-  console.log(SerialPort);
+  Port = null;
+  console.log(Port);
   //
   document.getElementById('connection').innerHTML = ""
   listSerialPorts()
+}
+
+async function flushConnection() {
+  if (Port && Port.isOpen) {
+    Port.flush(function(error) {
+      if (!error) {
+        console.log('flush complete.');
+      }
+    });
+  }
+  console.log(Port);
+  updateinterface()
+}
+
+async function drainConnection() {
+  if (Port && Port.isOpen) {
+    Port.drain(function(error) {
+      if (!error) {
+        console.log('drain complete.');
+      }
+    });
+  }
+  console.log(Port);
+  updateinterface()
+}
+
+async function readConnection() {
+  if (Port && Port.isOpen) {
+    Port.read(function(error) {
+      if (!error) {
+        console.log('read complete.');
+      }
+    });
+  }
+  console.log(Port);
+  updateinterface()
 }
 
 async function setDTR(bool) {
@@ -118,7 +179,7 @@ async function setDTR(bool) {
     dsr: bool,
     dtr: bool
   };
-  SerialPort.set(props, function(error) {
+  Port.set(props, function(error) {
     if (!error) {
       console.log('set complete.');
     }
@@ -126,13 +187,27 @@ async function setDTR(bool) {
     return callback(error);
   });
   await delay(50)
-  SerialPort.get(function(error, status) {
+  Port.get(function(error, status) {
     if (!error) {
       console.log(status);
     }
 
     return callback(error);
   });
+}
+
+async function writePort() {
+  var stri = 'hardware.layout\n';
+  console.log('try write.');
+  Port.write(stri);
+  console.log('write complete.');
+  // Buffer.from([]), function(error) {
+  //   if (!error) {
+  //     console.log('write complete.');
+  //   }
+
+  //   return callback(error);
+  // });
 }
 
 let callback = (error, result) => {
@@ -144,9 +219,9 @@ let callback = (error, result) => {
 };
 
 async function resetDevice() {
-  if (SerialPort && SerialPort.isOpen) {
+  if (Port && Port.isOpen) {
     console.log("  Update baud rate")
-    SerialPort.update({baudRate: 1200});
+    Port.update({baudRate: 1200});
     console.log("  dtr true")
     setDTR(true)
     await delay(1000)
